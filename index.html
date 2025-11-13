@@ -1,0 +1,218 @@
+<!doctype html>
+<html>
+
+<head>
+  <link href="//fonts.googleapis.com/css?family=Raleway:400,300,600" rel="stylesheet" type="text/css">
+
+  <style>
+    *{
+      font-family:Raleway
+    }
+    html{
+      background-color: #eee;
+    }
+    canvas{
+      background-color:white
+    }
+  </style>
+</head>
+
+<body>
+  <div>
+    <h1>Discrete Fourier Transform Sandbox</h1>
+  </div>
+  <div>
+    <h2>Click on the frequency checkboxes to see the sum of the sine waves. The sum of all sine waves is the original
+      signal.</h2>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/14.8.1/math.js"
+    integrity="sha512-AJmFmOXFAAzxbzp498VFGf+/Ke7n/O/Pz7L7R2in/4lEDkqhFvuIemyJo/MzXORunJkrJngeIyaWqLAj2rTY2Q=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <script>
+    const signal = [1, 2, 1, 2, 3, 4, 5, 6]
+    const result = []
+
+    const N = signal.length
+
+    //Get the Fourier numbers
+    for (let k = 0; k < N; k++) {
+      let sum = math.complex(0, 0)
+      for (let n = 0; n < N; n++) {
+        const exponent = math.complex(0, -2 * Math.PI * k * n / N)
+        const coefficient = math.exp(exponent)
+        const value = math.multiply(signal[n], coefficient)
+        sum = math.add(sum, value)
+      }
+      result.push(sum)
+    }
+    
+    //Get the frequencies
+
+    let index = 0
+    const newSums = new Array(N).fill(0)
+    const frequencies = new Array(N).fill(null).map(() => new Array(N))
+    for (let k = 0; k < N; k++) {
+      const complex = result[k]
+
+      let magnitude = Math.sqrt(math.re(complex) ** 2 + math.im(complex) ** 2)
+      const phase = Math.atan2(math.im(complex), math.re(complex))
+      console.log(magnitude, phase)
+      const scale = magnitude
+      for (let t = 0; t < N; t++) {
+        const f = k / N
+        const value = (magnitude / N) * Math.cos(2 * Math.PI * f * t + phase)
+        frequencies[k][t] = value
+        newSums[t] += value
+        console.log(value)
+      }
+      index++
+      console.log(newSums)
+    }
+    newSums.forEach((e, i) => newSums[i] = Math.round(e * 1000) / 1000)
+    console.log(newSums)
+
+
+    colors = ["black", "red", "green", "blue", "pink", "lightgreen", "lightblue"]
+
+    //Create the HTML pieces
+
+    const div = document.createElement("div")
+    document.body.appendChild(div)
+    div.style.margin = "5px"
+
+    //Create the main canvas where we show the sum of values
+
+    const mainCanvas = document.createElement("canvas")
+    mainCanvas.id = "main-canvas"
+    mainCanvas.width = window.innerWidth - 20
+    mainCanvas.height = 100
+    document.body.append(mainCanvas)
+    const ctx = mainCanvas.getContext("2d")
+
+    //Create the canvas for each frequency
+
+    for (let k = 0; k < N; k++) {
+      //Create the checkbox for this frequency
+      const subDiv = document.createElement("span")
+      const checkbox = document.createElement("input")
+      checkbox.type = "checkbox"
+      checkbox.id = "checkbox" + k
+      checkbox.style.margin = "5px"
+      checkbox.onclick = update
+      const p = document.createElement("label")
+      p.innerText = "f " + k
+      subDiv.append(p)
+      subDiv.appendChild(checkbox)
+      div.appendChild(subDiv)
+
+      //Create the canvas for this frequency
+
+      const canvas = document.createElement("canvas")
+      canvas.width = window.innerWidth - 20
+      canvas.height = window.innerHeight / (N + 5)
+      document.body.appendChild(canvas)
+
+      const ctx = canvas.getContext("2d")
+      ctx.translate(0, canvas.height / 2)
+      ctx.scale(canvas.width / (N - 1), -4)
+
+      //Start by drawing the grid values
+      ctx.lineWidth = 1 / 5
+      ctx.setLineDash([.1, .1])
+
+      ctx.strokeStyle = "lightgray"
+      ctx.lineTo(0, 0)
+      ctx.lineTo(N, 0)
+      ctx.stroke()
+
+      ctx.setLineDash([])
+
+      //Now draw time signal
+      for (let i = 0; i < N; i++) {
+        ctx.fillStyle = "gray"
+        ctx.beginPath()
+        ctx.arc(i, signal[i], .1, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      //Now draw the frequency
+
+      ctx.beginPath()
+      ctx.lineWidth = 1 / 5
+      ctx.strokeStyle = colors[k % colors.length]
+
+      for (let t = 0; t < N; t++) {
+        ctx.lineTo(t, frequencies[k][t])
+      }
+
+      ctx.stroke()
+    }
+
+    //The function that gets called whenever we check a checkbox
+    function update() {
+      ctx.fillStyle = "white"
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+
+      //Do a uniform scale
+      ctx.save()
+      const scale = ctx.canvas.height / ((Math.max(...signal) + 1) - (Math.min(...signal) - 1))
+      ctx.scale(scale, -scale)
+      ctx.translate(1, -(Math.max(...signal) + 1))
+      const toScale = ctx.canvas.width / (N - .75) / scale
+      ctx.lineWidth = 1 / 5
+
+      //Draw the zero line in x
+      ctx.beginPath()
+      ctx.strokeStyle = "lightgray"
+      ctx.setLineDash([2, 2])
+      ctx.lineTo(0, 0)
+      ctx.lineTo(N * toScale, 0)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      //Draw the zero line in y
+      ctx.beginPath()
+      ctx.strokeStyle = "lightgray"
+      ctx.setLineDash([1, 1])
+      ctx.lineTo(0, -100)
+      ctx.lineTo(0, 100)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      //Draw the points from our time series
+      for (let i = 0; i < N; i++) {
+        ctx.fillStyle = "gray"
+        ctx.beginPath()
+        ctx.arc(i * toScale, signal[i], .5, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      const sums = new Array(N).fill(0)
+
+      for (let k = 0; k < N; k++) {
+        if (document.querySelector("#checkbox" + k).checked) {
+          for (let t = 0; t < N; t++) {
+            sums[t] += frequencies[k][t]
+          }
+        }
+      }
+
+      //Draw the sum of the frequencies
+      ctx.strokeStyle = "black"
+      ctx.beginPath()
+      for (let i = 0; i < N; i++) {
+        ctx.lineTo(i * toScale, sums[i])
+        ctx.stroke()
+      }
+
+
+      ctx.restore()
+    }
+
+    update()
+
+  </script>
+</body>
+
+</html>
